@@ -30,63 +30,81 @@ The erad file type is composed of three main modules: A file header, a trace hea
 |Index in file  | Data Type  | Description                        | Value
 |    :---:      |     :---:  |:-----                              | :-------- 
 |     0         |`int8_t[8]` | Magic number                       | `{0x00, 0x45, 0x41, 0x53, 0x59, 0x52, 0x41, 0x44}`
-|     8         |`int8_t`    | File version                       |
-|     9         |`int8_t[2]` | Endianness marker                  |
-|     11        |`int8_t`    | Radar type                         |
-|     12        |`int16_t`   | Year                               |
-|     14        |`int16_t`   | Month                              |
-|     16        |`int16_t`   | Day                                |
-|     18        |`int16_t`   | Dimension                          |
-|     20        |`int16_t`   | Data offset                        |
-|     22        |`float`     | Time window                        |
-|     24        |`float`     | Total X                            |
-|     28        |`float`     | Total Y                            |
-|     32        |`int16_t`   | Sample size                        |
-|     36        |`uint8_t`   | Steps per meter                    |
-|     38        |`int8_t`    | Coordinate system                  |
-|     40        |`float`     | Dielectric of medium               |
-|     44        |`float`     | Interval along X                   |
-|     48        |`float`     | Interval along Y                   |
+|     8         |`int8_t`    | File version                       | `{VER_2018 = 0x03, VER_2019 = 0x04}`
+|     9         |`int8_t[2]` | Endianness marker                  | Big endian:`{0xFE, 0xFF}` Little endian: `{0xFF, 0xFE}`
+|     11        |`int8_t`    | Hardware version                   | `{PRE2017 = 0x01, POST2017 = 0x05}`
+|     12        |`int8_t`    | Radar type                         |`{SCUDO = 0x09, DIPOLO = 0x0B, CONCRETTO = 0x0A, CUSTOM = 0x08}`
+|     14        |`int16_t`   | Year                               |
+|     16        |`int16_t`   | Month                              |
+|     18        |`int16_t`   | Day                                |
+|     20        |`int16_t`   | Dimension                          |`{SINGLE_SLICE_TEMPORAL = 0x00, SINGLE_SLICE_SPATIAL = 0x01, VERTICAL_3D = 0x02, HORIZONTAL_3D = 0x03, VERTICAL_HORIZONTAL = 0x04, VERTICAL_SLICES_TEMPORAL= 0x05, HORIZONTAL_SLICES_TEMPORAL = 0x06, VER_HOR_TEMPORAL = 0x07}`
+|     22        |`int16_t`   | Data offset to first trace         | `212`
+|     24        |`float`     | Time window                        | This value depends on your GPR
+|     28        |`float`     | Total X                            | 0 if Dimension < `VERTICAL_3D`
+|     32        |`float`     | Total Y                            | 0 if Dimension < `VERTICAL_3D`
+|     36        |`int16_t`   | Sample size                        | Usually 585 for Hardware version >= `POST2017`
+|     38        |`uint8_t`   | Steps per meter                    | Value of recorded signals on a stepped wheel encoder over a 1 meter distance
+|     39        |`int8_t`    | Coordinate system                  |`{GLOBAL = 0x01, LOCAL = 0x02, GLOBAL_LOCAL = 0x03}`
+|     40        |`float`     | Dielectric of medium               | 
+|     44        |`float`     | Interval along X                   | 0 if Dimension < `VERTICAL_3D` || Dimension == `HORIZONTAL_3D`
+|     48        |`float`     | Interval along Y                   | 0 if Dimension < `HORIZONTAL_3D`
 |     52        |`char[58]`  | Operator                           |
 |     110       |`char[102]` | Location                           |
 
 
 ##### Trace Header
-
 Each trace header field has an byte index `FH_SIZE + trace_index_in_file*(TH_SIZE + sample_size) + N` where FH_SIZE is the size of the file header and TH_SIZE is the size of the trace header.
 
 | N             | Data Type  | Description                        | Value
 |    :---:      |     :---:  |:-----                              | :-------- 
 |     0         |`int64_t`   | Trace index in file                | Start at 0 
-|     8         |`int16_t`   | Sample size                        |
-|     10        |`int16_t`   | Steps per trace                    |
+|     8         |`int16_t`   | Sample size                        | Usually 585 for modern Oerad hardware. Number of sample points per trace 
+|     10        |`int16_t`   | Steps per trace                    | Recorded step signals from stepped wheel encoder per sample
 |     12        |`int8_t`    | Hour                               |
 |     13        |`int8_t`    | Minute                             |
 |     14        |`int8_t`    | Second                             |
-|     15        |`int16_t`   | Millisecond                        |
-|     17        |`int32_t`   | Fold index                         |
-|     21        |`int8_t`    | Fold orientation                   |
+|     15        |`int16_t`   | Millisecond                        | 
+|     17        |`int32_t`   | Fold index                         | Start at 0
+|     21        |`int8_t`    | Fold orientation                   | `{VERTICAL = 0x00, HORIZONTAL = 0x01}`
 |     22        |`int32_t`   | Trace index in fold                |
-|     26        |`double`    | X local                            |
-|     34        |`double`    | Y local                            |
-|     42        |`double`    | Z local                            |
-|     50        |`double`    | Longitude                          |
-|     58        |`double`    | Latitude                           |
+|     26        |`double`    | X local                            | In meters from survey start point
+|     34        |`double`    | Y local                            | In meters from survey start point
+|     42        |`double`    | Z local                            | In meters from survey start point
+|     50        |`double`    | Longitude                          | In degrees as fixed point value. Negative for S and W, positive for N and E
+|     58        |`double`    | Latitude                           | In degrees as fixed point value. Negative for S and W, positive for N and E
 
 ##### Data
+Data from Oerad radar systems is encoded in 585-byte traces that are fed to the acquisition system every 55ms. Each sample point is an unsigned integer (uint8_t). In Oerad's hardware each data sample is derived from 32 separate measurements for Scudo and Dipolo, and 384 measurements per sample for Concretto. 
 
 #### Segy
-
-
+Liberadfile takes on a simplistic approach with regards to the SEG-Y standard. For a detailed account on the file structure please refer to [the official standard definition](https://seg.org/Portals/0/SEG/News%20and%20Resources/Technical%20Standards/seg_y_rev2_0-mar2017.pdf). The general structure of the segy is
+    `Segy Textual Header + Segy Binary Header + N*(Segy Trace Header + Trace Data)`
+In practice there may be extended textual headers of both the whole file and the traces. Liberadfile omits these.
 
 
 ### Glossary
-
+Trace: 
+Slice: 
+Fold: 
+Fold Orientation: 
+Dimensions: 
 
 ### Library Structure
 
 
 ### Workflow
+1. Open file
+2. Read or write?
+3. If Read
+  3.1. Check file if compatible
+  3.2. Get file info
+  3.3. Get trace info and data
+4. If Write
+  4.1. Populate an EradFileHeader struct instance and pass it to `liberad_write_file_header`
+  4.2. Get trace data
+  4.3. Populate an EradTraceHeader struct instance and pass it and trace data buffer to `liberad_write_trace`
+  4.4. Call to `liberad_finish_write`
+5. Close file
 
 
 ### Examples 
