@@ -24,6 +24,7 @@ This library is intended for software developers, researchers and students who w
 
 #### Erad
 The erad file type is composed of three main modules: A file header, a trace header and trace data. The file ends with a total trace count field. In the graphic below you can see the file structure. The file format is endianness-agnostic.
+![Erad file format structure](https://i.imgur.com/KTs4cgE.png)
 
 ##### File Header
 
@@ -93,18 +94,7 @@ Dimensions:
 
 
 ### Workflow
-1. Open file
-2. Read or write?
-3. If Read
-  3.1. Check file if compatible
-  3.2. Get file info
-  3.3. Get trace info and data
-4. If Write
-  4.1. Populate an EradFileHeader struct instance and pass it to `liberad_write_file_header`
-  4.2. Get trace data
-  4.3. Populate an EradTraceHeader struct instance and pass it and trace data buffer to `liberad_write_trace`
-  4.4. Call to `liberad_finish_write`
-5. Close file
+![liberadfile workflow diagram](https://i.imgur.com/YWUhj0G.png)
 
 
 ### Examples 
