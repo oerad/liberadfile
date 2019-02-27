@@ -5,9 +5,8 @@ Logging library for georadar data
 2.  [Installation](#installation)
 3.  [File Structure](#file-structure)
 4.  [Glossary](#glossary)
-5.  [Library Structure](#library-structure)
-6.  [Workflow](#workflow)
-7.  [Examples](#examples)
+5.  [Workflow](#workflow)
+6.  [Examples](#examples)
 
 ### Introduction
 LiberadFile is an open source C++ library for reading and logging trace data in the SEG-Y binary file format standard as well as in .erad file format. Only writing support is provided for the SEG-Y standard because of its complexity and variety - there are numerous both free and paid software packages for opening, viewing and manipulating data in the SEG-Y format. Erad on the other hand was created by Oerad Tech Ltd with simplicity in mind - it follows the SEG-Y paradigm of File Header + n*(Trace Header + data) but has stripped all unnecessary fields, simplified naming conventions and thus greatly reduced file size and readability. 
@@ -84,13 +83,9 @@ In practice there may be extended textual headers of both the whole file and the
 
 
 ### Glossary
-Trace: 
-Slice: 
-Fold: 
-Fold Orientation: 
-Dimensions: 
 
-### Library Structure
+![liberad gpr glossary](https://i.imgur.com/ujKHVlO.jpg)
+
 
 
 ### Workflow
