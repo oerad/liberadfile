@@ -46,8 +46,8 @@ The erad file type is composed of three main modules: A file header, a trace hea
 |     38        |`uint8_t`   | Steps per meter                    | Value of recorded signals on a stepped wheel encoder over a 1 meter distance
 |     39        |`int8_t`    | Coordinate system                  |`{GLOBAL = 0x01, LOCAL = 0x02, GLOBAL_LOCAL = 0x03}`
 |     40        |`float`     | Dielectric of medium               | 
-|     44        |`float`     | Interval along X                   | 0 if Dimension < `VERTICAL_3D` || Dimension == `HORIZONTAL_3D`
-|     48        |`float`     | Interval along Y                   | 0 if Dimension < `HORIZONTAL_3D`
+|     44        |`float`     | Slice interval along X             | 0 if Dimension < `VERTICAL_3D` || Dimension == `HORIZONTAL_3D`
+|     48        |`float`     | Slice interval along Y             | 0 if Dimension < `HORIZONTAL_3D`
 |     52        |`char[58]`  | Operator                           |
 |     110       |`char[102]` | Location                           |
 
