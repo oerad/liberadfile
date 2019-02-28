@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/log/logger.cpp
+liberadfile/liberadfile.h
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/log/liberadfile/liberadfile.h
+liberad/liberad.h
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/log/liberad/liberad.h
+iostream
+-
+thread
+-
+

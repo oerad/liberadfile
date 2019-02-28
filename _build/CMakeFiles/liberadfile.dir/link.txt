@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC   -shared -Wl,-soname,libliberadfile.so.1 -o libliberadfile.so.1.0.0 CMakeFiles/liberadfile.dir/src/liberadfile.cpp.o 

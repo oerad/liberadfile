@@ -1,0 +1,13 @@
+prefix=/usr/local
+exec_prefix=/usr/local
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: liberadfile
+Description: 
+Version: 1.0.0
+URL: https://www.oerad.eu/software
+
+Requires:
+Libs: -L${libdir} -lliberadfile
+Cflags: -I${includedir}

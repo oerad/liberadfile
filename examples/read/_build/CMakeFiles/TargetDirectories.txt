@@ -1,0 +1,3 @@
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/read/_build/CMakeFiles/rebuild_cache.dir
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/read/_build/CMakeFiles/Reader.dir
+/home/viva/software/liberad/liberadfile_test/liberadfile/examples/read/_build/CMakeFiles/edit_cache.dir

@@ -3,8 +3,7 @@
 
 #include <string>
 
-
-#define FH_SIZE 208
+#define FH_SIZE 212
 
 #define TH_SIZE_VER_1 55
 #define TH_SIZE_VER_2 66
@@ -32,7 +31,6 @@ struct EradFileHeader{
   int8_t magic_num[8];
   int8_t file_version;
   int8_t endianness_marker[2];
-  // int16_t endianness_marker;
   int8_t hardware_version;
   int16_t radar_type;
   int16_t year;
@@ -44,8 +42,8 @@ struct EradFileHeader{
   float total_x;
   float total_y;
   int16_t sample_size;
-  int16_t coordinate_system; // if (file_version==FILE_OLD) coordinate_system = LOCAL;
-  //TODO - test uint8_t steps_per_meter; int8_t coordinate_system;
+  uint8_t steps_per_meter;
+  int8_t coordinate_system; //if (file_version==FILE_OLD) coordinate_system = LOCAL;
   float dielectric_coeff;
   float interval_x;
   float interval_y;
@@ -76,15 +74,6 @@ struct EradTraceHeader{
 
 
 struct EradFileHeader_VER_1{
-
-    EradFileHeader_VER_1();
-
-    //Custom may soon refer to the wireless USB dongle
-    enum RadarType{SCUDO = 0x09, DIPOLO = 0x0B, CONCRETTO = 0x0A, CUSTOM = 0x08};
-    enum FileVersion{FILE_OLD = 0x03, FILE_NEW = 0x04};
-    enum HardwareVersion{PRE2017 = 0x01, POST2017 = 0x05};
-    enum Dimension{SINGLE_SLICE_TEMPORAL = 0x00, SINGLE_SLICE_SPATIAL = 0x01, VERTICAL_3D = 0x02, HORIZONTAL_3D = 0x03, VERTICAL_HORIZONTAL = 0x04};
-
 
     int8_t magin_num[8];
     int8_t file_version;

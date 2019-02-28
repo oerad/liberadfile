@@ -9,13 +9,17 @@ EndiannessMarker system_endianness;
 
 EndiannessMarker liberad_get_file_endianness(int8_t* header_endianness);
 
-
 EndiannessMarker liberad_get_system_endianness();
 
 std::string liberad_get_stream_mode(LiberadFile::Mode mode);
 
-// void liberad_shift_file_header_endianness(EradFileHeader* f_header);
+/* Shift fields in f_header from little to big endianness and vice versa.
+* @param EradFileHeader* f_header - pointer to file header for endianness conversion
+*/
+void liberad_shift_file_header_endianness(EradFileHeader* f_header);
+
 void liberad_shift_trace_header_ver1_endianness(EradTraceHeader_VER_1* t_header);
+
 void liberad_shift_trace_header_ver2_endianness(EradTraceHeader* t_header);
 
 
@@ -82,6 +86,8 @@ int liberad_open_file(LiberadFile* efile){
   efile->stream = fopen(efile->filename, stream_type.c_str());
 
   if (efile->stream == NULL){
+    // std::cout << "File errors: " << ferror(efile->stream) << std::endl;
+    cout << "could not open file " << endl;
     return ERROR;
   }
   efile->is_open = true;
@@ -121,20 +127,11 @@ void liberad_get_file_info(LiberadFile* efile, EradFileHeader* f_header){
     return;
   }
 
-  // liberad_read_file_header(efile->stream, f_header);
-
-  efile->endianness = liberad_read_file_header(efile->stream, f_header);
-
+  efile->endianness = liberad_read_file_header(efile->stream, f_header, efile->file_ver);
   efile->f_header = f_header;
-
-  if (efile->file_ver < liberad::VER_2019){
-    efile->f_header->coordinate_system = LOCAL;
-  }
 
   liberad_get_trace_count(efile);
   liberad_get_file_size(efile);
-
-
 }
 
 
@@ -148,8 +145,6 @@ void liberad_get_trace_at(LiberadFile* efile, int64_t trace_index, EradTraceHead
   }
 
   long int index = liberad_get_trace_header_index_at(trace_index, efile->f_header->sample_size, efile->file_ver);
-
-  printf("index: %ld \n", index);
 
   liberad_read_trace_header(efile, index, t_header);
 
@@ -239,40 +234,13 @@ void liberad_write_file_header(LiberadFile* efile, EradFileHeader* f_header){
   memcpy(f_header->magic_num, magic, 8);
   f_header->file_version = VER_2019;
   if (system_endianness == BIG_END){
-    // f_header->endianness_marker = 65534;
     f_header->endianness_marker[0] = 0xFE;
     f_header->endianness_marker[1] = 0xFF;
 
   } else {
     f_header->endianness_marker[0] = 0xFF;
     f_header->endianness_marker[1] = 0xFE;
-
-
-    // f_header->endianness_marker = 65279;
-
   }
-  printf ("writing file_version: %hhi \n", f_header->file_version);
-  printf ("writing endianness_marker 1: %hhx \n", f_header->endianness_marker[0]);
-  printf ("writing endianness marker 2: %hhx \n", f_header->endianness_marker[1]);
-  printf ("writing hardware_version: %hhd \n", f_header->hardware_version);
-  printf ("writing radar_type: %hd \n", f_header->radar_type);
-  printf ("writing year: %hd \n", f_header->year);
-  printf ("writing month: %hd \n", f_header->month);
-  printf ("writing day: %hd \n", f_header->day);
-  printf ("writing dimension: %hd \n", f_header->dimension);
-  printf ("writing data_offset: %hd \n", f_header->data_offset);
-  printf ("writing time_window: %f \n", f_header->time_window);
-  printf ("writing total_x: %f \n", f_header->total_x);
-  printf ("writing total_y: %f \n", f_header->total_y);
-  printf ("writing sample_size: %hd \n", f_header->sample_size);
-  printf ("writing CoordinateSystem: %hd \n", f_header->coordinate_system);
-  printf ("writing Dielectric: %f \n", f_header->dielectric_coeff);
-  printf ("writing interval_x: %f \n", f_header->interval_x);
-  printf ("writing interval_y: %f \n", f_header->interval_y);
-  printf ("writing scan_operator: %s \n", f_header->scan_operator);
-  printf ("writing Location: %s \n", f_header->location);
-
-
 
   fwrite(f_header, FH_SIZE, 1, efile->stream);
   fflush(efile->stream);
@@ -315,8 +283,6 @@ void liberad_export_to_segy(LiberadFile* source, const char* destination){
     EradFileHeader f_header;
     liberad_get_file_info(source, &f_header);
   }
-
-  cout << "file_size: " << source->file_size << endl;
 
   FILE* dest = fopen(destination, "wb");
   if (dest == NULL){
@@ -543,7 +509,6 @@ void liberad_get_file_size(LiberadFile* efile){
   fseek(efile->stream, 0, SEEK_END);
   long int count = ftell(efile->stream);
   efile->file_size = count;
-  // return ftell(efile->stream);
 
 }
 
@@ -566,11 +531,9 @@ long int liberad_get_trace_data_index_at(int64_t trace_index, int sample_size, i
 long int liberad_get_trace_header_index_at(int64_t trace_index, int sample_size, int8_t file_version){
 
   if (file_version == VER_2018){
-    // return FH_SIZE + trace_index * (TH_SIZE_VER_1 + sample_size);
-    return 212 + trace_index * (TH_SIZE_VER_1 + sample_size);
+    return FH_SIZE + trace_index * (TH_SIZE_VER_1 + sample_size);
   } else {
     return FH_SIZE + trace_index * (TH_SIZE_VER_2 + sample_size);
-    // return 212+ trace_index * (TH_SIZE_VER_2 + sample_size);
   }
 
 }
@@ -597,6 +560,13 @@ void liberad_port_trace_header_data(EradTraceHeader_VER_1* source, EradTraceHead
   destination->longitude = 0;
   destination->latitude = 0;
 
+}
+
+
+void liberad_port_file_header_data(EradFileHeader_VER_1* src, EradFileHeader* dest){
+  memcpy(src, dest, FH_SIZE);
+  dest->steps_per_meter = static_cast<uint8_t>(src->steps_per_meter);
+  dest->coordinate_system = liberad::LOCAL;
 }
 
 
@@ -642,6 +612,7 @@ void liberad_read_trace_header(LiberadFile* efile, long int index_file, EradTrac
   }
 }
 
+
 void liberad_read_trace_header(FILE* stream, long int index_f, EradTraceHeader* t_header, liberad::EndiannessMarker endianness, int8_t file_ver){
   fseek(stream, index_f, SEEK_SET);
 
@@ -663,14 +634,21 @@ void liberad_read_trace_header(FILE* stream, long int index_f, EradTraceHeader* 
 }
 
 //done
-EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header){
-
+EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header, int8_t file_ver){
   fseek(stream, 0, SEEK_SET);
   fread(f_header, FH_SIZE, 1, stream);
 
+  if (file_ver < liberad::VER_2019){
+    fseek(stream, 38, SEEK_SET);
+    int16_t temp;
+    fread(&temp, sizeof(int16_t), 1, stream);
+
+    f_header->steps_per_meter = static_cast<uint8_t>(temp);
+    f_header->coordinate_system = LOCAL;
+  }
+
   EndiannessMarker endianness = liberad_get_file_endianness(f_header->endianness_marker);
   if (endianness != system_endianness){
-    cout << "i am shifting endianness here " << endl << endl;
     liberad_shift_file_header_endianness(f_header);
   }
 
@@ -743,11 +721,8 @@ EndiannessMarker liberad_get_system_endianness(){
   int num = 1;
   if(*(char *)&num == 1)
   {
-      cout << "sys endianness is little endian " << endl;
       return LITTLE_END;
   }
-  cout << "sys endianness is big endian " << endl;
-
   return BIG_END;
 
 }
@@ -756,10 +731,8 @@ EndiannessMarker liberad_get_system_endianness(){
 EndiannessMarker liberad_get_file_endianness(int8_t* header_endianness){
 
   if (header_endianness[0] == static_cast<int8_t>(0xFE) && header_endianness[1] == static_cast<int8_t>(0xFF)){
-    cout << "FILE IS BIG ENDIAN" << endl;
     return BIG_END;
   }
-  cout << "FILE IS LITTLE ENDIAN" << endl;
   return LITTLE_END;
 
 

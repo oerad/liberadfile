@@ -1,0 +1,7 @@
+/usr/local/lib/libliberadfile.so.1.0.0
+/usr/local/lib/libliberadfile.so.1
+/usr/local/lib/libliberadfile.so
+/usr/local/include/liberadfile/erad.h
+/usr/local/include/liberadfile/segy.h
+/usr/local/include/liberadfile/liberadfile.h
+/usr/local/share/pkgconfig/liberadfile.pc

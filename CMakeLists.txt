@@ -21,12 +21,13 @@ add_library(liberadfile SHARED
 
 #target_link_libraries(liberadfile usb-1.0)
 
+set(PRIVATE_HS include/erad.h include/segy.h)
+
 set_target_properties(liberadfile PROPERTIES
     VERSION ${PROJECT_VERSION}
     SOVERSION 1
     PUBLIC_HEADER include/liberadfile.h
-    PRIVATE_HEADER include/erad.h
-    PRIVATE_HEADER include/segy.h)
+    PRIVATE_HEADER "${PRIVATE_HS}")
 
 configure_file(liberadfile.pc.in liberadfile.pc @ONLY)
 

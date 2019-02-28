@@ -122,7 +122,8 @@ void liberad_read_trace_header(FILE* stream, long int index_f, EradTraceHeader* 
 * @param FILE* stream - pointer to opened and valid LiberadFile FILE stream instance
 * @param EradFileHeader *f_header - pointer to EradFileHeader struct to populate with data from file
 */
-liberad::EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header);
+// liberad::EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header);
+liberad::EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header, int8_t file_ver);
 
 /* Returns a string with the radar name based on file code
 * @param int16_t radar - code stored in EradFileHeader of every .erad file
@@ -251,12 +252,6 @@ void liberad_port_data_segy(uint8_t* data_source, int16_t* data_dest, int data_l
 
 
 /* ----------------------------------------------------------------------------------------------------------------- */
-
-/* Shift fields in f_header from little to big endianness and vice versa.
-* @param EradFileHeader* f_header - pointer to file header for endianness conversion
-*/
-void liberad_shift_file_header_endianness(EradFileHeader* f_header);
-
 
 /* Closes this efile instance's FILE stream
 * @param  LiberadFile* efile - pointer to opened .erad file instance
