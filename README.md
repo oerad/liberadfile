@@ -1,5 +1,5 @@
 # liberadfile
-Logging library for georadar data 
+Logging library for georadar data
 
 1.  [Introduction](#introduction)
 2.  [Installation](#installation)
@@ -9,7 +9,7 @@ Logging library for georadar data
 6.  [Examples](#examples)
 
 ### Introduction
-LiberadFile is an open source C++ library for reading and logging trace data in the SEG-Y binary file format standard as well as in .erad file format. Only writing support is provided for the SEG-Y standard because of its complexity and variety - there are numerous both free and paid software packages for opening, viewing and manipulating data in the SEG-Y format. Erad on the other hand was created by Oerad Tech Ltd with simplicity in mind - it follows the SEG-Y paradigm of File Header + n*(Trace Header + data) but has stripped all unnecessary fields, simplified naming conventions and thus greatly reduced file size and readability. 
+LiberadFile is an open source C++ library for reading and logging trace data in the SEG-Y binary file format standard as well as in .erad file format. Only writing support is provided for the SEG-Y standard because of its complexity and variety - there are numerous both free and paid software packages for opening, viewing and manipulating data in the SEG-Y format. Erad on the other hand was created by Oerad Tech Ltd with simplicity in mind - it follows the SEG-Y paradigm of File Header + n*(Trace Header + data) but has stripped all unnecessary fields, simplified naming conventions and thus greatly reduced file size and readability.
 
 As of February 2019 .erad files are processed only by software developed by Oerad but this open source library is an invitation for incorporating this simple GPR data format in other tools and platforms.
 
@@ -17,7 +17,32 @@ This library is intended for software developers, researchers and students who w
 
 
 ### Installation
+Current installation instructions are for Unix systems. Future releases will include support for Windows. We're using cmake for easy portability.
 
+1. Download or clone the project to your system.
+2. [Get CMake](https://cmake.org/install/).
+3. open a terminal in the download location or cd to it
+
+		cd 'download/location/of/liberadfile'
+
+4. Generate a folder to store your build files, for example:
+
+		mkdir _build
+
+5. Generate your build files.
+
+		cmake -H. -B_build -G "Unix Makefiles"
+
+6. Install liberadfile
+
+		cd _build
+		sudo make install
+
+7. To use in your project add this to your header file:
+
+		#include <liberadfile/liberadfile.h>
+
+Make sure to link the library in your project's CMakeLists file. More detailed examples can be found in the examples folder. A call to `sudo ldconfig` may be necessary after installation.
 
 ### File Structure
 
@@ -28,7 +53,7 @@ The erad file type is composed of three main modules: A file header, a trace hea
 ##### File Header
 
 |Index in file  | Data Type  | Description                        | Value
-|    :---:      |     :---:  |:-----                              | :-------- 
+|    :---:      |     :---:  |:-----                              | :--------
 |     0         |`int8_t[8]` | Magic number                       | `{0x00, 0x45, 0x41, 0x53, 0x59, 0x52, 0x41, 0x44}`
 |     8         |`int8_t`    | File version                       | `{VER_2018 = 0x03, VER_2019 = 0x04}`
 |     9         |`int8_t[2]` | Endianness marker                  | Big endian:`{0xFE, 0xFF}` Little endian: `{0xFF, 0xFE}`
@@ -45,7 +70,7 @@ The erad file type is composed of three main modules: A file header, a trace hea
 |     36        |`int16_t`   | Sample size                        | Usually 585 for Hardware version >= `POST2017`
 |     38        |`uint8_t`   | Steps per meter                    | Value of recorded signals on a stepped wheel encoder over a 1 meter distance
 |     39        |`int8_t`    | Coordinate system                  |`{GLOBAL = 0x01, LOCAL = 0x02, GLOBAL_LOCAL = 0x03}`
-|     40        |`float`     | Dielectric of medium               | 
+|     40        |`float`     | Dielectric of medium               |
 |     44        |`float`     | Slice interval along X             | 0 if Dimension < `VERTICAL_3D` || Dimension == `HORIZONTAL_3D`
 |     48        |`float`     | Slice interval along Y             | 0 if Dimension < `HORIZONTAL_3D`
 |     52        |`char[58]`  | Operator                           |
@@ -56,14 +81,14 @@ The erad file type is composed of three main modules: A file header, a trace hea
 Each trace header field has an byte index `FH_SIZE + trace_index_in_file*(TH_SIZE + sample_size) + N` where FH_SIZE is the size of the file header and TH_SIZE is the size of the trace header.
 
 | N             | Data Type  | Description                        | Value
-|    :---:      |     :---:  |:-----                              | :-------- 
-|     0         |`int64_t`   | Trace index in file                | Start at 0 
-|     8         |`int16_t`   | Sample size                        | Usually 585 for modern Oerad hardware. Number of sample points per trace 
+|    :---:      |     :---:  |:-----                              | :--------
+|     0         |`int64_t`   | Trace index in file                | Start at 0
+|     8         |`int16_t`   | Sample size                        | Usually 585 for modern Oerad hardware. Number of sample points per trace
 |     10        |`int16_t`   | Steps per trace                    | Recorded step signals from stepped wheel encoder per sample
 |     12        |`int8_t`    | Hour                               |
 |     13        |`int8_t`    | Minute                             |
 |     14        |`int8_t`    | Second                             |
-|     15        |`int16_t`   | Millisecond                        | 
+|     15        |`int16_t`   | Millisecond                        |
 |     17        |`int32_t`   | Fold index                         | Start at 0
 |     21        |`int8_t`    | Fold orientation                   | `{VERTICAL = 0x00, HORIZONTAL = 0x01}`
 |     22        |`int32_t`   | Trace index in fold                |
@@ -74,7 +99,7 @@ Each trace header field has an byte index `FH_SIZE + trace_index_in_file*(TH_SIZ
 |     58        |`double`    | Latitude                           | In degrees as fixed point value. Negative for S and W, positive for N and E
 
 ##### Data
-Data from Oerad radar systems is encoded in 585-byte traces that are fed to the acquisition system every 55ms. Each sample point is an unsigned integer (uint8_t). In Oerad's hardware each data sample is derived from 32 separate measurements for Scudo and Dipolo, and 384 measurements per sample for Concretto. 
+Data from Oerad radar systems is encoded in 585-byte traces that are fed to the acquisition system every 55ms. Each sample point is an unsigned integer (uint8_t). In Oerad's hardware each data sample is derived from 32 separate measurements for Scudo and Dipolo, and 384 measurements per sample for Concretto.
 
 #### Segy
 Liberadfile takes on a simplistic approach with regards to the SEG-Y standard. For a detailed account on the file structure please refer to [the official standard definition](https://seg.org/Portals/0/SEG/News%20and%20Resources/Technical%20Standards/seg_y_rev2_0-mar2017.pdf). The general structure of the segy is
@@ -92,4 +117,24 @@ In practice there may be extended textual headers of both the whole file and the
 ![liberadfile workflow diagram](https://i.imgur.com/YWUhj0G.png)
 
 
-### Examples 
+### Examples
+You can find several examples in the examples folder. Each has its own CMakeLists.txt file and can be installed.
+1. open a terminal in the example folder
+
+		cd 'download/location/of/liberadfile/examples/log'
+
+4. Generate a folder to store your build files, for example:
+
+		mkdir _build
+
+5. Generate your build files.
+
+		cmake -H. -B_build -G "Unix Makefiles"
+
+6. Build the project
+
+		sudo --build _build
+
+7. Run the example:
+
+		_build/Logger 

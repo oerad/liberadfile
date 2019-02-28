@@ -2,6 +2,7 @@
 #include "liberad/liberad.h"
 #include <iostream>
 #include <thread>
+#include <math.h>
 
 
 using namespace std;
@@ -14,8 +15,8 @@ static uint8_t out_buffer[OUT_BUFFER_SIZE];
 
 
 Oeradar* active_gpr = nullptr;
-LiberadFile* file = nullptr;
-EradTraceHeader* t_h = nullptr;
+SegyFile* file = nullptr;
+SegyTraceHeader* t_h = nullptr;
 
 atomic<bool> running;
 atomic<bool> logging;
@@ -62,11 +63,21 @@ int main(){
 //callback on new data from GPR
 void data_in(unsigned char* buffer, int received, signed char steps){
   if (logging){
-    t_h->trace_index = trace_count;
-    t_h->sample_size = received;
-    t_h->steps_per_trace = steps;
-    t_h->trace_index_in_fold = trace_count;
-    liberad_write_trace(file, t_h, buffer);
+    // set necessary fields for segy trace header
+    t_h->traceSequenceNumInLine = trace_count;
+    t_h->traceSequenceNumInFile = trace_count;
+    t_h->originalRecordNum = trace_count;
+    t_h->ensembleNum = trace_count;
+    t_h->numSamples = received;
+
+    // record time
+    // t_h->hour = hour;
+    // t_h->minute = minute;
+    // t_h->second = second;
+
+    //write trace data
+    liberad_write_segy_trace(file, t_h, buffer, received);
+
     trace_count++;
   }
 }
@@ -80,12 +91,13 @@ void data_out(unsigned char* buffer, int sent){
 void start_logging(){
   cout << "start recording " << endl;
   //open file for write
-  const char* filename = "generated_001.erad";
-  file = new LiberadFile();
-  liberad_open_file(file, filename, LiberadFile::LIBERAD_WRITE);
+  const char* filename = "generated_001.sgy";
+  file = new SegyFile();
+  liberad_open_segy_file_w(file, filename);
 
-
-  //set header params
+  //Segy Textual header section. This example uses an erad header and then the helper function
+  //liberad_produce_segy_txt_header() which takes an erad header and translates it to a txt header
+  char* segy_txt_header = new char[SEGY_TXT_HEADER_SIZE];
   EradFileHeader f_header;
   f_header.hardware_version = static_cast<int8_t>(liberad::POST2017);
   f_header.radar_type = static_cast<int16_t>(liberad::CONCRETTO);
@@ -103,12 +115,31 @@ void start_logging(){
   f_header.interval_x = 0;
   f_header.interval_y = 0;
 
-  //write header to file
-  liberad_write_file_header(file, &f_header);
+  liberad_produce_segy_txt_header(&f_header, segy_txt_header, SEGY_TXT_HEADER_SIZE);
+  //write txt header to file
+  liberad_write_segy_txt_h(file, segy_txt_header);
+  //free up resources
+  delete segy_txt_header;
 
-  //init trace header struct
-  t_h = new EradTraceHeader();
+  // segy binary header section
+  SegyBinaryHeader bin_header;
 
+  // set necessary fields - here for convenience the erad file header fields are used
+  bin_header.jobID = 1;
+  bin_header.sampleIntervalUs = static_cast<int16_t>(round(f_header.time_window / 0.585)); //somehow this works
+  bin_header.samplesPerDataTrace = f_header.sample_size;
+  // this is the data format code. BYTE_1_UNS was added in the latest revision of the segy standard.
+  // We've noted that not all packages are compatible with the latest standard. If another format is used then
+  // incoming data in the data_in(..) callback should be cast to a suitable format. 
+  bin_header.formatCode = SegyBinaryHeader::BYTE_1_UNS;
+
+  //write binary header to file
+  liberad_write_segy_bin_h(file, &bin_header);
+
+  //init trace header struct for reuse on incoming data from gpr
+  t_h = new SegyTraceHeader();
+
+  // init logging params
   trace_count = 0;
   logging = true;
 }
@@ -116,11 +147,9 @@ void start_logging(){
 //stop logging gpr data to file
 void stop_logging(){
   logging = false;
-  // finish file write (writes total trace count to file)
-  liberad_finish_write(file);
 
   // close file
-  liberad_close_file(file);
+  liberad_close_segy_file_w(file);
 
   //clear resources
   delete file;
@@ -129,84 +158,6 @@ void stop_logging(){
   t_h = nullptr;
 }
 
-void check_file(){
-  if (file != nullptr){
-    cout << "file not null" << endl;
-    return;
-  }
-  const char* fn = "generated_001.erad";
-  file = new LiberadFile();
-  liberad_open_file(file, fn, LiberadFile::LIBERAD_READ);
-  if (!liberad_check_file(file)){
-    cout << "file not compatible" << endl;
-    delete file;
-    file = nullptr;
-    return;
-  }
-
-  EradFileHeader f_header;
-  liberad_get_file_info(file, &f_header);
-
-  printf ("Location: %s \n", file->filename);
-  printf ("Size: %ld \n", file->file_size);
-  printf ("version: %hhd \n", file->file_ver);
-  printf ("total trace count: %ld \n", file->trace_count);
-
-  print_fh_info(&f_header);
-
-// cleanup resources
-  liberad_close_file(file);
-  delete file;
-  file = nullptr;
-}
-
-void print_fh_info(EradFileHeader* f_h){
-
-  printf ("file_version: %hhi \n", f_h->file_version);
-  printf ("endianness_marker 1: %hhx \n", f_h->endianness_marker[0]);
-  printf ("endianness marker 2: %hhx \n", f_h->endianness_marker[1]);
-  printf ("hardware_version: %hhd \n", f_h->hardware_version);
-  printf ("radar_type: %hd \n", f_h->radar_type);
-  printf ("year: %hd \n", f_h->year);
-  printf ("month: %hd \n", f_h->month);
-  printf ("day: %hd \n", f_h->day);
-  printf ("dimension: %hd \n", f_h->dimension);
-  printf ("data_offset: %hd \n", f_h->data_offset);
-  printf ("time_window: %f \n", f_h->time_window);
-  printf ("total_x: %f \n", f_h->total_x);
-  printf ("total_y: %f \n", f_h->total_y);
-  printf ("sample_size: %hd \n", f_h->sample_size);
-  printf ("CoordinateSystem: %hd \n", f_h->coordinate_system);
-  printf ("Dielectric: %f \n", f_h->dielectric_coeff);
-  printf ("interval_x: %f \n", f_h->interval_x);
-  printf ("interval_y: %f \n", f_h->interval_y);
-  printf ("scan_operator: %s \n", f_h->scan_operator);
-  printf ("Location: %s \n", f_h->location);
-
-  printf("------------- \n");
-}
-
-void print_th_info(EradTraceHeader* t_h){
-
-  printf("trace index: %ld \n", t_h->trace_index);
-  printf("sample_size: %hd \n", t_h->sample_size);
-  printf("steps per t: %hd \n", t_h->steps_per_trace);
-  printf("hour: %hhd \n", t_h->hour);
-  printf("minute: %hhd \n", t_h->minute);
-  printf("second: %hd \n", t_h->second);
-  printf("millisecond: %d \n", t_h->millisecond);
-  printf("fold index: %d \n", t_h->fold_index);
-  printf("fold Orien: %hhd \n", t_h->fold_orientation);
-  printf("trace_index_in_fold: %d \n", t_h->trace_index_in_fold);
-  printf("x_local: %f \n", t_h->x_local);
-  printf("y_local: %f \n", t_h->y_local);
-  printf("z_local: %f \n", t_h->z_local);
-  printf("longitude: %f \n", t_h->longitude);
-  printf("latitude: %f \n", t_h->latitude);
-
-  printf("------------- \n");
-
-}
 
 // Get user input from terminal
 void user_input(){
@@ -255,10 +206,6 @@ void user_input(){
         //gain level 5
         liberad_set_gain_async(active_gpr, LEVEL5);
 
-      }
-      if (temp == "c"){
-        //check file we just wrote
-        check_file();
       }
       if (temp == "q"){
         //quit

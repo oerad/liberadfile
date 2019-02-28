@@ -9,34 +9,40 @@ void print_th_info(EradTraceHeader* t_h);
 
 int main(){
 
+  //open file for read
   LiberadFile file;
   const char* filename = "003.erad";
   liberad_open_file(&file, filename, LiberadFile::LIBERAD_READ);
 
+  //check if file is compatible
   if (!liberad_check_file(&file)){
     cout << "file not compatible" << endl;
     return 1;
   }
 
+  //populate a file header struct and get info about file
   EradFileHeader f_header;
   liberad_get_file_info(&file, &f_header);
   print_fh_info(&f_header);
 
+  //get trace data
   EradTraceHeader t_header;
   uint8_t* data = new uint8_t[f_header.sample_size];
-  // for (int i = 0; i < f_header.trace_count; i++){
-  for (int i = 0; i < 3; i++) {
+  // for (int i = 0; i < f_header.trace_count; i++){  // too verbose
+  for (int i = 0; i < 3; i++) { // illustrative example
     liberad_get_trace_at(&file, i, &t_header, data);
     print_th_info(&t_header);
   }
 
-
+  // clear resources
   delete data;
 
+  // close file
   liberad_close_file(&file);
 
 }
 
+// prints info from file header
 void print_fh_info(EradFileHeader* f_h){
 
   cout << "FILE HEADER INFO:" << endl;
@@ -65,6 +71,7 @@ void print_fh_info(EradFileHeader* f_h){
 
 }
 
+// prints info from trace header 
 void print_th_info(EradTraceHeader* t_h){
 
   printf("trace index: %ld \n", t_h->trace_index);
