@@ -1,1 +1,0 @@
-/usr/bin/c++    -rdynamic CMakeFiles/Reader.dir/reader.cpp.o  -o Reader -lliberadfile 

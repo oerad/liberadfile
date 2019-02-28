@@ -1,4 +1,4 @@
 #ignore build files
-**/build
+**/_build
 *.gch
 **/build_files

@@ -1,7 +1,0 @@
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/install/strip.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/edit_cache.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/liberadfile.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/install.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/rebuild_cache.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/list_install_components.dir
-/home/viva/software/liberad/liberadfile_test/liberadfile/_build/CMakeFiles/install/local.dir
