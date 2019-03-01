@@ -47,8 +47,8 @@ struct EradFileHeader{
   float dielectric_coeff;
   float interval_x;
   float interval_y;
-  char scan_operator[56]; // + 2
-  char location[100]; // + 2
+  char scan_operator[58];
+  char location[102];
 
 };
 
@@ -69,32 +69,6 @@ struct EradTraceHeader{
   double z_local = 0;
   double longitude = 0;
   double latitude = 0;
-
-};
-
-
-struct EradFileHeader_VER_1{
-
-    int8_t magin_num[8];
-    int8_t file_version;
-    int8_t endianness_marker[2];
-    int8_t hardware_version;
-    int16_t radar_type;
-    int16_t year;
-    int16_t month;
-    int16_t day;
-    int16_t dimension; //record type
-    int16_t data_offset;
-    float time_window;
-    float total_x;
-    float total_y;
-    int16_t sample_size;
-    int16_t steps_per_meter;
-    float dielectric_coeff;
-    float interval_x;
-    float interval_y;
-    char scan_operator[56];
-    char location[100];
 
 };
 
