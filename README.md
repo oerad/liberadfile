@@ -133,8 +133,8 @@ You can find several examples in the examples folder. Each has its own CMakeList
 
 6. Build the project
 
-		sudo --build _build
+		cmake --build _build
 
 7. Run the example:
 
-		_build/Logger 
+		_build/Logger

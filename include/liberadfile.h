@@ -74,6 +74,9 @@ void liberad_get_trace_header_at(LiberadFile* efile, int64_t trace_index, EradTr
 */
 void liberad_get_trace_data_at(LiberadFile* efile, int64_t trace_index, uint8_t* data);
 
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
 //TODO
 /*
 * @param  LiberadFile* efile - pointer to opened and valid .erad file instance
@@ -102,6 +105,9 @@ void liberad_get_trace_count(LiberadFile* efile);
 */
 void liberad_get_file_size(LiberadFile* efile);
 
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+
 /* Helper function for reading
 * @param  LiberadFile* efile - pointer to opened and valid .erad file instance
 * @param long int index_file - byte index of trace header within file
@@ -109,14 +115,6 @@ void liberad_get_file_size(LiberadFile* efile);
 */
 void liberad_read_trace_header(LiberadFile* efile, long int index_file, EradTraceHeader* t_header);
 
-/* Helper function for reading a trace header from an open FILE stream into t_header
-* @param  FILE* stream - pointer to opened and valid LiberadFile FILE stream instance
-* @param long int index_f - byte index of trace header within file
-* @param EradTraceHeader* t_header - pointer to EradTraceHeader struct to populate
-* @param liberad::EndiannessMarker marker - byte endianness of file (stored in LiberadFile::endianness)
-* @param int8_t file_ver - version of file (stored in LiberadFile::file_ver)
-*/
-void liberad_read_trace_header(FILE* stream, long int index_f, EradTraceHeader* t_header, liberad::EndiannessMarker endianness, int8_t file_ver);
 
 /* Helper function for reading file header from FILE stream into f_header
 * @param FILE* stream - pointer to opened and valid LiberadFile FILE stream instance
@@ -152,44 +150,6 @@ void liberad_write_trace(LiberadFile* efile, EradTraceHeader* theader, uint8_t* 
 */
 void liberad_finish_write(LiberadFile* efile);
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-/* Open a .sgy file for writing
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-* @param const char* filename - location of file
-*/
-int liberad_open_segy_file_w(SegyFile* sfile, const char* filename);
-
-/* Open a segy file for writing. Assumes filename field has been set
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-*/
-int liberad_open_segy_file_w(SegyFile* sfile);
-
-/* Writes a 3200-byte segy txt_header to file
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-* char* txt_header - pointer to char array holding the segy txt header
-*/
-void liberad_write_segy_txt_h(SegyFile* sfile, char* txt_header);
-
-/* Writes a segy binary header to file
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-* SegyBinaryHeader* b_header - pointer to segy binary header to write to file
-*/
-void liberad_write_segy_bin_h(SegyFile* sfile, SegyBinaryHeader* b_header);
-
-/* Writes segy binary trace header and raw trace data to file
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-* @param SegyTraceHeader* t_header - pointer to segy trace header to write to file
-* @param void* data - raw trace data to write to file
-* @param int data_size - number of samples in current trace
-*/
-void liberad_write_segy_trace(SegyFile* sfile, SegyTraceHeader* t_header, void* data, int data_size);
-
-
-/* Close the SegyFile stream instance
-* @param SegyFile* sfile - pointer to SegyFile .sgy instance
-*/
-void liberad_close_segy_file_w(SegyFile* sfile);
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
@@ -207,11 +167,23 @@ long int liberad_get_trace_header_index_at(int64_t trace_index, int sample_size,
 */
 long int liberad_get_trace_data_index_at(int64_t trace_index, int sample_size, int8_t file_version);
 
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
 /* Ports a pre VER_2019 file version trace header to a 2019 file version
 * @param EradTraceHeader_VER_1* source - pointer to a VER_1 (pre 2019) erad trace header
 * @param EradTraceHeader* destination - pointer to >= VER_2019 trace header struct instance
 */
 void liberad_port_trace_header_data(EradTraceHeader_VER_1* source, EradTraceHeader* destination);
+
+
+
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+/* Closes this efile instance's FILE stream
+* @param  LiberadFile* efile - pointer to opened .erad file instance
+*/
+void liberad_close_file(LiberadFile* efile);
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
@@ -250,13 +222,44 @@ void liberad_port_erad_segy_bin_file_header(EradFileHeader* f_header, SegyBinary
 */
 void liberad_port_data_segy(uint8_t* data_source, int16_t* data_dest, int data_length);
 
+/* ---------------------------------------------------------- */
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-/* Closes this efile instance's FILE stream
-* @param  LiberadFile* efile - pointer to opened .erad file instance
+/* Open a .sgy file for writing
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+* @param const char* filename - location of file
 */
-void liberad_close_file(LiberadFile* efile);
+int liberad_open_segy_file_w(SegyFile* sfile, const char* filename);
+
+/* Open a segy file for writing. Assumes filename field has been set
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+*/
+int liberad_open_segy_file_w(SegyFile* sfile);
+
+/* Writes a 3200-byte segy txt_header to file
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+* char* txt_header - pointer to char array holding the segy txt header
+*/
+void liberad_write_segy_txt_h(SegyFile* sfile, char* txt_header);
+
+/* Writes a segy binary header to file
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+* SegyBinaryHeader* b_header - pointer to segy binary header to write to file
+*/
+void liberad_write_segy_bin_h(SegyFile* sfile, SegyBinaryHeader* b_header);
+
+/* Writes segy binary trace header and raw trace data to file
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+* @param SegyTraceHeader* t_header - pointer to segy trace header to write to file
+* @param void* data - raw trace data to write to file
+* @param int data_size - number of samples in current trace
+*/
+void liberad_write_segy_trace(SegyFile* sfile, SegyTraceHeader* t_header, void* data, int data_size);
+
+
+/* Close the SegyFile stream instance
+* @param SegyFile* sfile - pointer to SegyFile .sgy instance
+*/
+void liberad_close_segy_file_w(SegyFile* sfile);
 
 
 #endif

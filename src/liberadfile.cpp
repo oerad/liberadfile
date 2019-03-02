@@ -5,23 +5,28 @@
 using namespace std;
 using namespace liberad;
 
+
+/* ----------------------------Forward declaration of helper functs------------------------------------------------ */
+
 EndiannessMarker system_endianness;
-
 EndiannessMarker liberad_get_file_endianness(int8_t* header_endianness);
-
 EndiannessMarker liberad_get_system_endianness();
 
 std::string liberad_get_stream_mode(LiberadFile::Mode mode);
 
-/* Shift fields in f_header from little to big endianness and vice versa.
-* @param EradFileHeader* f_header - pointer to file header for endianness conversion
-*/
 void liberad_shift_file_header_endianness(EradFileHeader* f_header);
-
 void liberad_shift_trace_header_ver1_endianness(EradTraceHeader_VER_1* t_header);
-
 void liberad_shift_trace_header_ver2_endianness(EradTraceHeader* t_header);
 
+void read_th_v1(FILE* stream, EradTraceHeader_VER_1* th);
+void read_th_v2(FILE* stream, EradTraceHeader* th);
+void read_fh(FILE* stream, EradFileHeader* fh);
+
+void write_th_v2(FILE* stream, EradTraceHeader* th);
+void write_fh(FILE* stream, EradFileHeader* fh);
+
+
+/* ----------------------------LiberadFile constructors------------------------------------------------ */
 
 LiberadFile::LiberadFile():
             f_header(nullptr),
@@ -56,10 +61,11 @@ LiberadFile::LiberadFile(Mode mode_, const char* filename_):
 LiberadFile::~LiberadFile(){
 
 }
-/* ----------------------------------------------------------------------------------------------------------------- */
+/* ---------------------------LiberadFile open & close------------------------------------------------------------ */
 
 
-//done
+/* Opens a LiberadFIle instance at filename location in mode. File is now available for in/out operations and checks. 
+*/
 int liberad_open_file(LiberadFile* efile, const char* filename, LiberadFile::Mode mode){
   if (filename == NULL || filename[0] == '\0'){
     cout << "filename is empty string " << endl;
@@ -72,7 +78,8 @@ int liberad_open_file(LiberadFile* efile, const char* filename, LiberadFile::Mod
   return liberad_open_file(efile);
 }
 
-//done
+/* Opens a LiberadFile instance. mode and filename must be set
+*/
 int liberad_open_file(LiberadFile* efile){
   if (efile->filename == nullptr || efile->filename[0] == '\0'){
     cout << "no file location associated with this LiberadFile" << endl;
@@ -86,16 +93,28 @@ int liberad_open_file(LiberadFile* efile){
   efile->stream = fopen(efile->filename, stream_type.c_str());
 
   if (efile->stream == NULL){
-    // std::cout << "File errors: " << ferror(efile->stream) << std::endl;
     cout << "could not open file " << endl;
     return ERROR;
   }
   efile->is_open = true;
   return SUCCESS;
 }
-/* ----------------------------------------------------------------------------------------------------------------- */
 
-//done
+/* Closes a LiberadFile instance if it is opened
+*/
+void liberad_close_file(LiberadFile* efile){
+  if (efile->is_open){
+    fclose(efile->stream);
+    efile->is_open = false;
+    efile->stream = nullptr;
+  }
+}
+
+
+/* -------------------------------------------------------------------------------------------------------- */
+
+/* Checks if this is a valid and compatible erad file. Closes the file if not compatible
+*/
 bool liberad_check_file(LiberadFile* efile){
   if (!efile->is_open){
     cout << "File not opened" << endl;
@@ -118,9 +137,12 @@ bool liberad_check_file(LiberadFile* efile){
 
   return true;
 }
-/* ----------------------------------------------------------------------------------------------------------------- */
 
-//done
+
+/* ------------------------------------Data Extraction---------------------------------------------------- */
+
+/* Gets file header data from an opened LiberadFile instance and stores it in f_header.
+*/
 void liberad_get_file_info(LiberadFile* efile, EradFileHeader* f_header){
   if (!(efile->is_open && efile->is_valid)){
     cout << "File not opened or valid"<< endl;
@@ -135,9 +157,9 @@ void liberad_get_file_info(LiberadFile* efile, EradFileHeader* f_header){
 }
 
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//done
+/* Gets trace header data and raw samples of a trace at trace_index (not byte pointer in file) of an opened LiberadFile
+* instance. Stores trace header data in t_header fields and data samples in data. Presumes data to be at least sample_size big.
+*/
 void liberad_get_trace_at(LiberadFile* efile, int64_t trace_index, EradTraceHeader* t_header, uint8_t* data){
   if (!efile->is_valid){
     cout << "File not compatible"<< endl;
@@ -145,14 +167,15 @@ void liberad_get_trace_at(LiberadFile* efile, int64_t trace_index, EradTraceHead
   }
 
   long int index = liberad_get_trace_header_index_at(trace_index, efile->f_header->sample_size, efile->file_ver);
-
   liberad_read_trace_header(efile, index, t_header);
-
   fread(data, efile->f_header->sample_size, 1, efile->stream);
 
 }
 
-//done
+
+/* Gets trace header data at trace_index(not byte pointer in file) of an opened instance of LiberadFile and populates
+* the fields of t_header
+*/
 void liberad_get_trace_header_at(LiberadFile* efile, int64_t trace_index, EradTraceHeader* t_header){
   if (!efile->is_valid){
     cout << "File not compatible"<< endl;
@@ -160,12 +183,13 @@ void liberad_get_trace_header_at(LiberadFile* efile, int64_t trace_index, EradTr
   }
 
   long int index = liberad_get_trace_header_index_at(trace_index, efile->f_header->sample_size, efile->file_ver);
-
   liberad_read_trace_header(efile, index, t_header);
 
 }
 
-//done
+
+/* Gets raw trace data at trace_index (not byte pointer) of an opened instance of LiberadFile and stores it in data buffer
+*/
 void liberad_get_trace_data_at(LiberadFile* efile, int64_t trace_index, uint8_t* data){
   if (!efile->is_valid){
     cout << "File not compatible"<< endl;
@@ -178,8 +202,42 @@ void liberad_get_trace_data_at(LiberadFile* efile, int64_t trace_index, uint8_t*
 
 }
 
-//data buffer must be at least (index_end-index_start)*sample_size big
-//done
+
+/* Gets the total trace count of an opened LiberadFile instance
+*/
+void liberad_get_trace_count(LiberadFile* efile){
+  if (!efile->is_open){
+    cout << "File not opened"<< endl;
+    return;
+  }
+
+  fseek(efile->stream, -sizeof(efile->trace_count), SEEK_END);
+  fread(&efile->trace_count, sizeof(efile->trace_count), 1, efile->stream);
+
+  if (system_endianness != efile->endianness){
+    efile->trace_count = shift_endianness<int64_t>(efile->trace_count);
+  }
+}
+
+
+/* Gets the file size of an opened LiberadFile instance
+*/
+void liberad_get_file_size(LiberadFile* efile){
+
+  if (!efile->is_open){
+    cout << "File not opened"<< endl;
+    return;
+  }
+
+  fseek(efile->stream, 0, SEEK_END);
+  long int count = ftell(efile->stream);
+  efile->file_size = count;
+
+}
+
+
+/* ----------------------------------Bulk data extraction - not tested--------------------------------------------------- */
+//TODO
 void liberad_get_trace_data(LiberadFile* efile, int64_t index_start, int64_t index_end, uint8_t* data){
   if (!efile->is_valid){
     cout << "File not compatible"<< endl;
@@ -219,11 +277,11 @@ void liberad_get_trace_data(LiberadFile* efile, int64_t index_start, int64_t ind
   delete[] data_buffer;
 }
 
+/* -------------------------------------Logging data ---------------------------------------------------- */
 
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//
+/* Writes a file header to an opened LiberadFile instance. Presumes that relevant header fields are preset.
+*/
 void liberad_write_file_header(LiberadFile* efile, EradFileHeader* f_header){
   if (!efile->is_open){
     cout << "File not opened"<< endl;
@@ -242,38 +300,105 @@ void liberad_write_file_header(LiberadFile* efile, EradFileHeader* f_header){
     f_header->endianness_marker[1] = 0xFE;
   }
 
-  fwrite(f_header, FH_SIZE, 1, efile->stream);
-  fflush(efile->stream);
+  write_fh(efile->stream, f_header);
+  // fwrite(f_header, FH_SIZE, 1, efile->stream);
+  // fflush(efile->stream);
 }
 
-//
+
+/* Writes a single trace's header and data samples to an opened LiberadFile instance. Presumes that relevant header fields are preset.
+*/
 void liberad_write_trace(LiberadFile* efile, EradTraceHeader* t_header, uint8_t* data){
   if (!efile->is_open){
     cout << "File not opened"<< endl;
     return;
   }
   fseek(efile->stream, liberad_get_trace_header_index_at(t_header->trace_index, t_header->sample_size, efile->file_ver), SEEK_SET);
-  fwrite(t_header, TH_SIZE_VER_2, 1, efile->stream);
+  write_th_v2(efile->stream, t_header);
   fwrite(data, t_header->sample_size, 1, efile->stream);
   efile->trace_count++;
-  fflush(efile->stream);
 
 }
 
+
+/* Writes a final int64_t trace_count value to file denoting the total number of traces stored in the file
+*/
 void liberad_finish_write(LiberadFile* efile){
   if (efile->trace_count == 0){
     cout << "nothing written to file" << endl;
     return;
   }
   fwrite(&efile->trace_count, sizeof(efile->trace_count), 1, efile->stream);
+  fflush(efile->stream);
 }
 
-/* ----------------------------------------------------------------------------------------------------------------- */
+
+/* Private funct. Writes an EradTraceHeader instance's fields to file . This preferred to a bulk
+* fwrite(&th, TH_SIZE_VER_2, 1, stream) because of memory padding and alignment on different systems. Presumes an
+* opened stream and a stream pointer previoiusly set to exact point in file (with fseek)
+*/
+void write_th_v2(FILE* stream, EradTraceHeader* th){
+
+    fwrite(&th->trace_index, sizeof(th->trace_index), 1, stream);
+    fwrite(&th->sample_size, sizeof(th->sample_size), 1, stream);
+    fwrite(&th->steps_per_trace, sizeof(th->steps_per_trace), 1, stream);
+    fwrite(&th->hour, sizeof(th->hour), 1, stream);
+    fwrite(&th->minute, sizeof(th->minute), 1, stream);
+    fwrite(&th->second, sizeof(th->second), 1, stream);
+    fwrite(&th->millisecond, sizeof(th->millisecond), 1, stream);
+    fwrite(&th->fold_index, sizeof(th->fold_index), 1, stream);
+    fwrite(&th->fold_orientation, sizeof(th->fold_orientation), 1, stream);
+    fwrite(&th->trace_index_in_fold, sizeof(th->trace_index_in_fold), 1, stream);
+    fwrite(&th->x_local, sizeof(th->x_local), 1, stream);
+    fwrite(&th->y_local, sizeof(th->y_local), 1, stream);
+    fwrite(&th->z_local, sizeof(th->z_local), 1, stream);
+    fwrite(&th->longitude, sizeof(th->longitude), 1, stream);
+    fwrite(&th->latitude, sizeof(th->latitude), 1, stream);
+
+    fflush(stream);
+
+}
 
 
+/*  Private funct. Writes an EradFileHeader instance's fields to file . This preferred to a bulk
+* fwrite(&fh, FH_SIZE, 1, stream) because of memory padding and alignment on different systems. Presumes an
+* opened stream and a stream pointer previoiusly set to exact point in file (with fseek)
+*/
+void write_fh(FILE* stream, EradFileHeader* fh){
+
+    fwrite(&fh->magic_num , sizeof(int8_t), 8, stream);
+    fwrite(&fh->file_version , sizeof(fh->file_version), 1, stream);
+    fwrite(&fh->endianness_marker , sizeof(int8_t), 2, stream);
+    fwrite(&fh->hardware_version , sizeof(fh->hardware_version), 1, stream);
+    fwrite(&fh->radar_type , sizeof(fh->radar_type), 1, stream);
+    fwrite(&fh->year , sizeof(fh->year), 1, stream);
+    fwrite(&fh->month , sizeof(fh->month), 1, stream);
+    fwrite(&fh->day , sizeof(fh->day), 1, stream);
+    fwrite(&fh->dimension , sizeof(fh->dimension), 1, stream);
+    fwrite(&fh->data_offset , sizeof(fh->data_offset), 1, stream);
+    fwrite(&fh->time_window , sizeof(fh->time_window), 1, stream);
+    fwrite(&fh->total_x , sizeof(fh->total_x), 1, stream);
+    fwrite(&fh->total_y , sizeof(fh->total_y), 1, stream);
+    fwrite(&fh->sample_size , sizeof(fh->sample_size), 1, stream);
+    fwrite(&fh->steps_per_meter , sizeof(fh->steps_per_meter), 1, stream);
+    fwrite(&fh->coordinate_system , sizeof(fh->coordinate_system), 1, stream);
+    fwrite(&fh->dielectric_coeff , sizeof(fh->dielectric_coeff), 1, stream);
+    fwrite(&fh->interval_x , sizeof(fh->interval_x), 1, stream);
+    fwrite(&fh->interval_y , sizeof(fh->interval_y), 1, stream);
+    fwrite(&fh->scan_operator , sizeof(char), 58, stream);
+    fwrite(&fh->location , sizeof(char), 102, stream);
+
+    fflush(stream);
+
+}
+
+
+/* -------------------------------------Segy export operations----------------------------------------------- */
+
+
+/* Exports an erad file to a segy file
+*/
 void liberad_export_to_segy(LiberadFile* source, const char* destination){
-
-
   if (!(source->is_open && source->is_valid) ){
     cout << "source file not open or valid" << endl;
     return;
@@ -292,7 +417,6 @@ void liberad_export_to_segy(LiberadFile* source, const char* destination){
 
 
   fseek(dest, 0, SEEK_SET);
-
   char* segy_txt_header = new char[SEGY_TXT_HEADER_SIZE];
 
   SegyBinaryHeader bin_header;
@@ -304,7 +428,6 @@ void liberad_export_to_segy(LiberadFile* source, const char* destination){
   segy_trace_header.year = source->f_header->year;
   segy_trace_header.day = source->f_header->day;
   segy_trace_header.sampleInterval = static_cast<int16_t>(round(source->f_header->time_window / 0.585)) ;
-
 
   fwrite(segy_txt_header, sizeof(char), SEGY_TXT_HEADER_SIZE, dest);
   fwrite(&bin_header, SEGY_BIN_HEADER_SIZE, 1, dest);
@@ -329,7 +452,9 @@ void liberad_export_to_segy(LiberadFile* source, const char* destination){
   fclose(dest);
 }
 
-//DONE assumes sizeof(txt_header) = 3200;
+
+/* Ports data from an erad file header to a segy textual file header and stores it into txt_header buffer
+*/
 void liberad_produce_segy_txt_header(EradFileHeader* f_header, char* txt_header, int txt_h_size){
   string radar = liberad_get_radar_string(f_header->radar_type);
 
@@ -351,7 +476,9 @@ void liberad_produce_segy_txt_header(EradFileHeader* f_header, char* txt_header,
 
 }
 
-//done
+
+/* Ports data from an erad file header to a segy binary header
+*/
 void liberad_port_erad_segy_bin_file_header(EradFileHeader* f_header, SegyBinaryHeader* segy_bin_header){
 
   segy_bin_header->jobID = 1;
@@ -360,7 +487,9 @@ void liberad_port_erad_segy_bin_file_header(EradFileHeader* f_header, SegyBinary
 
 }
 
-//done
+
+/* Ports data from an erad trace header to a segy trace header
+*/
 void liberad_port_erad_segy_bin_trace_header(EradTraceHeader* t_header, SegyTraceHeader* segy_t_header){
 
   segy_t_header->traceSequenceNumInLine = static_cast<int32_t> (t_header->trace_index);
@@ -374,7 +503,10 @@ void liberad_port_erad_segy_bin_trace_header(EradTraceHeader* t_header, SegyTrac
 
 }
 
-//done
+
+/* Ports raw data (uint8_t) from an Oerad hardware to an int16_t data type. After tests with different free and
+* paid segy software packages, this is the most portable data format.
+*/
 void liberad_port_data_segy(uint8_t* data_source, int16_t* data_dest, int data_length){
   int i;
   int8_t original;
@@ -388,47 +520,31 @@ void liberad_port_data_segy(uint8_t* data_source, int16_t* data_dest, int data_l
 }
 
 
-
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//done
-void liberad_close_file(LiberadFile* efile){
-
-  if (efile->is_open){
-    fclose(efile->stream);
-    efile->is_open = false;
-    efile->stream = nullptr;
-
-  }
-}
+/* ----------------------------------------Segy logger operations----------------------------------------------- */
 
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//DONE
+/* Opens an instance of SegyFile for write at filename location
+*/
 int liberad_open_segy_file_w(SegyFile* sfile, const char* filename){
   if (filename == NULL || filename[0] == '\0'){
     cout << "filename is empty string " << endl;
     return ERROR;
   }
   sfile->filename = filename;
-
   return liberad_open_segy_file_w(sfile);
-
 }
 
-//DONE
+
+/* Opens an instance of SegyFile for write
+*/
 int liberad_open_segy_file_w(SegyFile* sfile){
   if (sfile->filename == nullptr || sfile->filename[0] == '\0'){
     cout << "no file location associated with this LiberadFile" << endl;
     return ERROR;
   }
-
   // get system endianness on first call - maybe put in init call
   system_endianness = liberad_get_system_endianness();
-
   sfile->stream = fopen(sfile->filename, "wb");
-
   if (sfile->stream == NULL){
     return ERROR;
   }
@@ -436,7 +552,9 @@ int liberad_open_segy_file_w(SegyFile* sfile){
   return SUCCESS;
 }
 
-// DONE
+
+/* Writes a segy textual header to file from buffer txt_header
+*/
 void liberad_write_segy_txt_h(SegyFile* sfile, char* txt_header){
   if (!sfile->is_open){
     cout << "File not opened" << endl;
@@ -446,7 +564,8 @@ void liberad_write_segy_txt_h(SegyFile* sfile, char* txt_header){
   fwrite(txt_header, sizeof(char), SEGY_TXT_HEADER_SIZE, sfile->stream);
 }
 
-// DONE
+
+// TODO write struct fields separately to avoid padding and aligning issues
 void liberad_write_segy_bin_h(SegyFile* sfile, SegyBinaryHeader* b_header){
   if (!sfile->is_open){
     cout << "File not opened" << endl;
@@ -457,7 +576,8 @@ void liberad_write_segy_bin_h(SegyFile* sfile, SegyBinaryHeader* b_header){
 
 }
 
-// Done
+
+// TODO write struct fields separately to avoid padding and aligning issues
 void liberad_write_segy_trace(SegyFile* sfile, SegyTraceHeader* t_header, const void* data, int data_size){
   if (!sfile->is_open){
     cout << "File not opened" << endl;
@@ -471,7 +591,8 @@ void liberad_write_segy_trace(SegyFile* sfile, SegyTraceHeader* t_header, const 
 }
 
 
-// DONE
+/* Closes a SegyFile's stream instance.
+*/
 void liberad_close_segy_file_w(SegyFile* sfile){
   if (sfile->is_open){
     fclose(sfile->stream);
@@ -481,42 +602,11 @@ void liberad_close_segy_file_w(SegyFile* sfile){
 }
 
 
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//done
-void liberad_get_trace_count(LiberadFile* efile){
-  if (!efile->is_open){
-    cout << "File not opened"<< endl;
-    return;
-  }
-
-  fseek(efile->stream, -sizeof(efile->trace_count), SEEK_END);
-  fread(&efile->trace_count, sizeof(efile->trace_count), 1, efile->stream); // TODO test here pointer or address
-
-  if (system_endianness != efile->endianness){
-    efile->trace_count = shift_endianness<int64_t>(efile->trace_count);
-  }
-}
-
-//done
-void liberad_get_file_size(LiberadFile* efile){
-
-  if (!efile->is_open){
-    cout << "File not opened"<< endl;
-    return;
-  }
-
-  fseek(efile->stream, 0, SEEK_END);
-  long int count = ftell(efile->stream);
-  efile->file_size = count;
-
-}
-
-/* ----------------------------------------------------------------------------------------------------------------- */
+/* --------------------------------Helper calculators----------------------------------------------------------- */
 
 
-
-//done
+/* Calcultes and returns the location of the first byte of a single trace's data with trace_index(as in first, second or 33th trace)
+*/
 long int liberad_get_trace_data_index_at(int64_t trace_index, int sample_size, int8_t file_version){
 
   if (file_version == VER_2018){
@@ -527,7 +617,9 @@ long int liberad_get_trace_data_index_at(int64_t trace_index, int sample_size, i
 
 }
 
-//done
+
+/* Calcultes and returns the location of the first byte of a trace header with trace_index(as in first, second or 33th trace)
+*/
 long int liberad_get_trace_header_index_at(int64_t trace_index, int sample_size, int8_t file_version){
 
   if (file_version == VER_2018){
@@ -541,7 +633,8 @@ long int liberad_get_trace_header_index_at(int64_t trace_index, int sample_size,
 
 /* ----------------------------------------------------------------------------------------------------------------- */
 
-//done
+/* Ports a trace header from an old version of the file to the latest version.
+*/
 void liberad_port_trace_header_data(EradTraceHeader_VER_1* source, EradTraceHeader* destination){
 
   destination->trace_index = source->trace_index;
@@ -563,49 +656,24 @@ void liberad_port_trace_header_data(EradTraceHeader_VER_1* source, EradTraceHead
 }
 
 
-void liberad_port_file_header_data(EradFileHeader_VER_1* src, EradFileHeader* dest){
-  memcpy(src, dest, FH_SIZE);
-  dest->steps_per_meter = static_cast<uint8_t>(src->steps_per_meter);
-  dest->coordinate_system = liberad::LOCAL;
-}
+/* -------------------------------Data Readers---------------------------------------------------------------- */
 
-
-
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-//done
-std::string liberad_get_stream_mode(LiberadFile::Mode mode){
-  std::string mode_str;
-  if (mode == LiberadFile::LIBERAD_APPEND){
-    mode_str = "ab";
-  } else if (mode == LiberadFile::LIBERAD_READ){
-    mode_str = "rb";
-  } else {
-    mode_str = "wb";
-  }
-  return mode_str;
-}
-
-/* ----------------------------------------------------------------------------------------------------------------- */
-
-
-//done
+/* Reads erad trace header data into an EradTraceHeader instance from an opened file stream.
+*/
 void liberad_read_trace_header(LiberadFile* efile, long int index_file, EradTraceHeader* t_header){
 
   fseek(efile->stream, index_file, SEEK_SET);
 
   if (efile->file_ver < VER_2019){
     EradTraceHeader_VER_1 th;
-    fread(&th, TH_SIZE_VER_1, 1, efile->stream);
+    read_th_v1(efile->stream, &th);
     if (efile->endianness != system_endianness){
       liberad_shift_trace_header_ver1_endianness(&th);
     }
-
     liberad_port_trace_header_data(&th, t_header);
 
   } else {
-
-    fread(t_header, TH_SIZE_VER_2, 1, efile->stream);
+    read_th_v2(efile->stream, t_header);
     if (efile->endianness != system_endianness){
       liberad_shift_trace_header_ver2_endianness(t_header);
     }
@@ -613,30 +681,12 @@ void liberad_read_trace_header(LiberadFile* efile, long int index_file, EradTrac
 }
 
 
-void liberad_read_trace_header(FILE* stream, long int index_f, EradTraceHeader* t_header, liberad::EndiannessMarker endianness, int8_t file_ver){
-  fseek(stream, index_f, SEEK_SET);
-
-  if (file_ver < VER_2019){
-    EradTraceHeader_VER_1 th;
-    fread(&th, TH_SIZE_VER_1, 1, stream);
-    if (endianness != system_endianness){
-      liberad_shift_trace_header_ver1_endianness(&th);
-    }
-    liberad_port_trace_header_data(&th, t_header);
-
-  } else {
-
-    fread(t_header, TH_SIZE_VER_2, 1, stream);
-    if (endianness != system_endianness){
-      liberad_shift_trace_header_ver2_endianness(t_header);
-    }
-  }
-}
-
-//done
+/* Reads erad file header data into an EradFileHeader instance from an opened file stream and returns this file's
+* endianness
+*/
 EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header, int8_t file_ver){
   fseek(stream, 0, SEEK_SET);
-  fread(f_header, FH_SIZE, 1, stream);
+  read_fh(stream, f_header);
 
   if (file_ver < liberad::VER_2019){
     fseek(stream, 38, SEEK_SET);
@@ -655,9 +705,91 @@ EndiannessMarker liberad_read_file_header(FILE* stream, EradFileHeader* f_header
   return endianness;
 }
 
-/* ----------------------------------------------------------------------------------------------------------------- */
 
-//done
+/* Private funct. Reads data from file into an EradTraceHeader instance's fields. This preferred to a bulk
+* fread(&th, TH_SIZE_VER_1, 1, stream) because of memory padding and alignment on different systems. Presumes an
+* opened stream and a stream pointer previoiusly set to exact point in file (with fseek)
+*/
+void read_th_v1(FILE* stream, EradTraceHeader_VER_1* th){
+
+    fread(&th->trace_index, sizeof(th->trace_index), 1, stream);
+    fread(&th->sample_size, sizeof(th->sample_size), 1, stream);
+    fread(&th->steps_per_trace, sizeof(th->steps_per_trace), 1, stream);
+    fread(&th->hour, sizeof(th->hour), 1, stream);
+    fread(&th->minute, sizeof(th->minute), 1, stream);
+    fread(&th->second, sizeof(th->second), 1, stream);
+    fread(&th->millisecond, sizeof(th->millisecond), 1, stream);
+    fread(&th->fold_index, sizeof(th->fold_index), 1, stream);
+    fread(&th->fold_orientation, sizeof(th->fold_orientation), 1, stream);
+    fread(&th->trace_index_in_fold, sizeof(th->trace_index_in_fold), 1, stream);
+    fread(&th->x_local, sizeof(th->x_local), 1, stream);
+    fread(&th->y_local, sizeof(th->y_local), 1, stream);
+    fread(&th->z_local, sizeof(th->z_local), 1, stream);
+
+}
+
+
+/* Private funct. Reads data from file into an EradTraceHeader instance's fields. This preferred to a bulk
+* fread(&th, TH_SIZE_VER_2, 1, stream) because of memory padding and alignment on different systems. Presumes an
+* opened stream and a stream pointer previoiusly set to exact point in file (with fseek)
+*/
+void read_th_v2(FILE* stream, EradTraceHeader* th){
+
+    fread(&th->trace_index, sizeof(th->trace_index), 1, stream);
+    fread(&th->sample_size, sizeof(th->sample_size), 1, stream);
+    fread(&th->steps_per_trace, sizeof(th->steps_per_trace), 1, stream);
+    fread(&th->hour, sizeof(th->hour), 1, stream);
+    fread(&th->minute, sizeof(th->minute), 1, stream);
+    fread(&th->second, sizeof(th->second), 1, stream);
+    fread(&th->millisecond, sizeof(th->millisecond), 1, stream);
+    fread(&th->fold_index, sizeof(th->fold_index), 1, stream);
+    fread(&th->fold_orientation, sizeof(th->fold_orientation), 1, stream);
+    fread(&th->trace_index_in_fold, sizeof(th->trace_index_in_fold), 1, stream);
+    fread(&th->x_local, sizeof(th->x_local), 1, stream);
+    fread(&th->y_local, sizeof(th->y_local), 1, stream);
+    fread(&th->z_local, sizeof(th->z_local), 1, stream);
+    fread(&th->longitude, sizeof(th->longitude), 1, stream);
+    fread(&th->latitude, sizeof(th->latitude), 1, stream);
+
+}
+
+
+/* Private funct. Reads data from file into an EradFileHeader instance's fields. This preferred to a bulk
+* fread(&fh, FH_SIZE, 1, stream) because of memory padding and alignment on different systems. Presumes an
+* opened stream and a stream pointer previoiusly set to exact point in file (with fseek)
+*/
+void read_fh(FILE* stream, EradFileHeader* fh){
+
+    fread(&fh->magic_num , sizeof(int8_t), 8, stream);
+    fread(&fh->file_version , sizeof(fh->file_version), 1, stream);
+    fread(&fh->endianness_marker , sizeof(int8_t), 2, stream);
+    fread(&fh->hardware_version , sizeof(fh->hardware_version), 1, stream);
+    fread(&fh->radar_type , sizeof(fh->radar_type), 1, stream);
+    fread(&fh->year , sizeof(fh->year), 1, stream);
+    fread(&fh->month , sizeof(fh->month), 1, stream);
+    fread(&fh->day , sizeof(fh->day), 1, stream);
+    fread(&fh->dimension , sizeof(fh->dimension), 1, stream);
+    fread(&fh->data_offset , sizeof(fh->data_offset), 1, stream);
+    fread(&fh->time_window , sizeof(fh->time_window), 1, stream);
+    fread(&fh->total_x , sizeof(fh->total_x), 1, stream);
+    fread(&fh->total_y , sizeof(fh->total_y), 1, stream);
+    fread(&fh->sample_size , sizeof(fh->sample_size), 1, stream);
+    fread(&fh->steps_per_meter , sizeof(fh->steps_per_meter), 1, stream);
+    fread(&fh->coordinate_system , sizeof(fh->coordinate_system), 1, stream);
+    fread(&fh->dielectric_coeff , sizeof(fh->dielectric_coeff), 1, stream);
+    fread(&fh->interval_x , sizeof(fh->interval_x), 1, stream);
+    fread(&fh->interval_y , sizeof(fh->interval_y), 1, stream);
+    fread(&fh->scan_operator , sizeof(char), 58, stream);
+    fread(&fh->location , sizeof(char), 102, stream);
+
+}
+
+
+/* -----------------------------Endianness helper functs--------------------------------------------------------------- */
+
+
+/* Shifts a file header's endianness.
+*/
 void liberad_shift_file_header_endianness(EradFileHeader* f_header){
 
   f_header->radar_type = shift_endianness<int16_t>(f_header->radar_type);
@@ -670,14 +802,15 @@ void liberad_shift_file_header_endianness(EradFileHeader* f_header){
   f_header->total_x = shift_endianness<float>(f_header->total_x);
   f_header->total_y = shift_endianness<float>(f_header->total_y);
   f_header->sample_size = shift_endianness<int16_t>(f_header->sample_size);
-  f_header->coordinate_system = shift_endianness<int16_t>(f_header->coordinate_system);
   f_header->dielectric_coeff = shift_endianness<float>(f_header->dielectric_coeff);
   f_header->interval_x = shift_endianness<float>(f_header->interval_x);
   f_header->interval_y = shift_endianness<float>(f_header->interval_y);
 
 }
 
-//done
+
+/* Shifts a VER_2018-version trace header's endianness.
+*/
 void liberad_shift_trace_header_ver1_endianness(EradTraceHeader_VER_1* t_header){
 
   t_header->trace_index = shift_endianness<int64_t>(t_header->trace_index);
@@ -695,7 +828,9 @@ void liberad_shift_trace_header_ver1_endianness(EradTraceHeader_VER_1* t_header)
 
 }
 
-//done
+
+/* Shifts a VER_2019-version trace header's endianness.
+*/
 void liberad_shift_trace_header_ver2_endianness(EradTraceHeader* t_header){
 
   t_header->trace_index = shift_endianness<int64_t>(t_header->trace_index);
@@ -715,7 +850,8 @@ void liberad_shift_trace_header_ver2_endianness(EradTraceHeader* t_header){
 /* ----------------------------------------------------------------------------------------------------------------- */
 
 
-//done
+/* Returns the current system's endianness.
+*/
 EndiannessMarker liberad_get_system_endianness(){
 
   int num = 1;
@@ -727,7 +863,9 @@ EndiannessMarker liberad_get_system_endianness(){
 
 }
 
-//done
+
+/* Returns the endianness of the file when reading
+*/
 EndiannessMarker liberad_get_file_endianness(int8_t* header_endianness){
 
   if (header_endianness[0] == static_cast<int8_t>(0xFE) && header_endianness[1] == static_cast<int8_t>(0xFF)){
@@ -738,6 +876,11 @@ EndiannessMarker liberad_get_file_endianness(int8_t* header_endianness){
 
 }
 
+/* ----------------------------------------------------------------------------------------------------------------- */
+
+
+/* Returns a human readable string with the Oerad hardware name based on its code
+*/
 std::string liberad_get_radar_string(int16_t radar){
   string radar_str;
   switch (radar) {
@@ -756,4 +899,19 @@ std::string liberad_get_radar_string(int16_t radar){
   }
 
   return radar_str;
+}
+
+
+/* Helper. Returns a string with the stream mode for input/output/append file stream ops
+*/
+std::string liberad_get_stream_mode(LiberadFile::Mode mode){
+  std::string mode_str;
+  if (mode == LiberadFile::LIBERAD_APPEND){
+    mode_str = "ab";
+  } else if (mode == LiberadFile::LIBERAD_READ){
+    mode_str = "rb";
+  } else {
+    mode_str = "wb";
+  }
+  return mode_str;
 }
